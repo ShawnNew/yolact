@@ -43,6 +43,7 @@ COCO_CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
                 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
                 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
 
+
 COCO_LABEL_MAP = { 1:  1,  2:  2,  3:  3,  4:  4,  5:  5,  6:  6,  7:  7,  8:  8,
                    9:  9, 10: 10, 11: 11, 13: 12, 14: 13, 15: 14, 16: 15, 17: 16,
                   18: 17, 19: 18, 20: 19, 21: 20, 22: 21, 23: 22, 24: 23, 25: 24,
@@ -54,7 +55,12 @@ COCO_LABEL_MAP = { 1:  1,  2:  2,  3:  3,  4:  4,  5:  5,  6:  6,  7:  7,  8:  8
                   74: 65, 75: 66, 76: 67, 77: 68, 78: 69, 79: 70, 80: 71, 81: 72,
                   82: 73, 84: 74, 85: 75, 86: 76, 87: 77, 88: 78, 89: 79, 90: 80}
 
+SCALE_CLASSES = ('car', 'truck', 'bus', 'bike', 'motorcycle', 'pedestrian',
+                 'rider', 'traffic_device_construction', 'stop',
+                 'other', 'red', 'green', 'yellow', 'black', 'void_dynamic')
 
+SCALE_LABEL_MAP = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
+                   10: 10, 11: 11, 12: 12, 13: 13, 14: 14, 15: 15}
 
 # ----------------------- CONFIG CLASS ----------------------- #
 
@@ -133,7 +139,8 @@ coco2014_dataset = dataset_base.copy({
     
     'train_info': './data/coco/annotations/instances_train2014.json',
     'valid_info': './data/coco/annotations/instances_val2014.json',
-
+    'train_images': './data/coco/images/train2014',
+    'valid_images': './data/coco/images/val2014',
     'label_map': COCO_LABEL_MAP
 })
 
@@ -142,7 +149,8 @@ coco2017_dataset = dataset_base.copy({
     
     'train_info': './data/coco/annotations/instances_train2017.json',
     'valid_info': './data/coco/annotations/instances_val2017.json',
-
+    'train_images': './data/coco/images/train2017',
+    'valid_images': './data/coco/images/val2017',
     'label_map': COCO_LABEL_MAP
 })
 
@@ -153,6 +161,16 @@ coco2017_testdev_dataset = dataset_base.copy({
     'has_gt': False,
 
     'label_map': COCO_LABEL_MAP
+})
+
+scale2020_dataset = dataset_base.copy({
+    'name': 'SCALE 2020',
+    'train_info': './data/scale/annotations/train_2020.json',
+    'valid_info': './data/scale/annotations/val_2020.json',
+    'train_images': './data/scale/images',
+    'valid_images': './data/scale/images',
+    'label_map': SCALE_LABEL_MAP,
+    'class_names': SCALE_CLASSES
 })
 
 PASCAL_CLASSES = ("aeroplane", "bicycle", "bird", "boat", "bottle",
@@ -657,8 +675,8 @@ yolact_base_config = coco_base_config.copy({
     'name': 'yolact_base',
 
     # Dataset stuff
-    'dataset': coco2017_dataset,
-    'num_classes': len(coco2017_dataset.class_names) + 1,
+    'dataset': scale2020_dataset,
+    'num_classes': len(scale2020_dataset.class_names) + 1,
 
     # Image Size
     'max_size': 550,
