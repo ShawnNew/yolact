@@ -29,6 +29,8 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 
+from export_onnx import onnx_export
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -113,10 +115,11 @@ def parse_args(argv=None):
                         help='When displaying / saving video, draw the FPS on the frame')
     parser.add_argument('--emulate_playback', default=False, dest='emulate_playback', action='store_true',
                         help='When saving a video, emulate the framerate that you\'d get running in real-time mode.')
+    parser.add_argument('--export', type=str, help='Export to onnx model')
 
     parser.set_defaults(no_bar=False, display=False, resume=False, output_coco_json=False, output_web_json=False, shuffle=False,
                         benchmark=False, no_sort=False, no_hash=False, mask_proto_debug=False, crop=True, detect=False, display_fps=False,
-                        emulate_playback=False)
+                        emulate_playback=False, export=False)
 
     global args
     args = parser.parse_args(argv)
@@ -1094,10 +1097,15 @@ if __name__ == '__main__':
             dataset = None        
 
         print('Loading model...', end='')
-        net = Yolact()
+        net = Yolact(onnx=(args.export is not None))
         net.load_weights(args.trained_model)
         net.eval()
         print(' Done.')
+
+        if args.export:
+            onnx_export(net, dataset, args.export)
+            print("Export to onnx model successfully.")
+            exit()
 
         if args.cuda:
             net = net.cuda()

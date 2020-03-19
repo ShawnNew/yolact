@@ -280,8 +280,9 @@ class FPN(ScriptModuleWrapper):
     __constants__ = ['interpolation_mode', 'num_downsample', 'use_conv_downsample', 'relu_pred_layers',
                      'lat_layers', 'pred_layers', 'downsample_layers', 'relu_downsample_layers']
 
-    def __init__(self, in_channels):
+    def __init__(self, in_channels, onnx=False):
         super().__init__()
+        self.onnx = onnx
 
         self.lat_layers  = nn.ModuleList([
             nn.Conv2d(x, cfg.fpn.num_features, kernel_size=1)
@@ -324,13 +325,17 @@ class FPN(ScriptModuleWrapper):
         # For backward compatability, the conv layers are stored in reverse but the input and output is
         # given in the correct order. Thus, use j=-i-1 for the input and output and i for the conv layers.
         j = len(convouts)
+        sizes = [(69, 69), (35, 35)]
         for lat_layer in self.lat_layers:
             j -= 1
 
             if j < len(convouts) - 1:
-                _, _, h, w = convouts[j].size()
-                x = F.interpolate(x, size=(h, w), mode=self.interpolation_mode, align_corners=False)
-            
+                if not self.onnx:
+                    _, _, h, w = convouts[j].size()
+                    x = F.interpolate(x, size=(h, w), mode=self.interpolation_mode, align_corners=False)
+                else:
+                    x = F.interpolate(x, size=sizes[j], mode=self.interpolation_mode, align_corners=False)
+
             x = x + lat_layer(convouts[j])
             out[j] = x
         
@@ -396,9 +401,10 @@ class Yolact(nn.Module):
         - pred_aspect_ratios: A list of lists of aspect ratios with len(selected_layers) (see PredictionModule)
     """
 
-    def __init__(self):
+    def __init__(self, onnx=False):
         super().__init__()
 
+        self.onnx = onnx
         self.backbone = construct_backbone(cfg.backbone)
 
         if cfg.freeze_bn:
@@ -436,7 +442,7 @@ class Yolact(nn.Module):
 
         if cfg.fpn is not None:
             # Some hacky rewiring to accomodate the FPN
-            self.fpn = FPN([src_channels[i] for i in self.selected_layers])
+            self.fpn = FPN([src_channels[i] for i in self.selected_layers], self.onnx)
             self.selected_layers = list(range(len(self.selected_layers) + cfg.fpn.num_downsample))
             src_channels = [cfg.fpn.num_features] * len(self.selected_layers)
 
@@ -673,7 +679,10 @@ class Yolact(nn.Module):
                 else:
                     pred_outs['conf'] = F.softmax(pred_outs['conf'], -1)
 
-            return self.detect(pred_outs, self)
+            if not self.onnx:
+                return self.detect(pred_outs, self)
+            else:
+                return pred_outs['loc'], pred_outs['conf'], pred_outs['mask'], pred_outs['priors'], pred_outs['proto']
 
 
 

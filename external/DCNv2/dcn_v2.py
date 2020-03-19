@@ -50,6 +50,13 @@ class _DCNv2(Function):
         return grad_input, grad_offset, grad_mask, grad_weight, grad_bias,\
             None, None, None, None,
 
+    @staticmethod
+    def symbolic(g, input, offset, mask, weight, bias,
+                 stride, padding, dilation, deformable_groups):
+        return g.op("DCNv2", input, offset, mask,\
+                    weight, bias, \
+                    stride_i=stride, padding_i=padding, dilation_i=dilation, \
+                    deformable_groups_i=deformable_groups)
 
 dcn_v2_conv = _DCNv2.apply
 
