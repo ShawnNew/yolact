@@ -1,4 +1,4 @@
-from backbone import ResNetBackbone, VGGBackbone, ResNetBackboneGN, DarkNetBackbone
+from backbone import ResNetBackbone, VGGBackbone, ResNetBackboneGN, DarkNetBackbone, MobileNetV2
 from math import sqrt
 import torch
 
@@ -318,6 +318,17 @@ vgg16_backbone = backbone_base.copy({
 
 
 
+mobilenetv2_backbone = resnet50_backbone.copy({
+    'name': 'MobileNetV2',
+    'path': 'mobilenet_v2.pth.tar',
+    'type': MobileNetV2,
+    'args': (),
+
+    'selected_layers': [1, 2, 3],
+    'pred_scales': [[24], [48], [96], [192], [384]],
+    'pred_aspect_ratios': [[[1.414]]] * 5,
+    'use_pixel_scales': False,
+})
 
 
 # ----------------------- MASK BRANCH TYPES ----------------------- #
@@ -686,7 +697,7 @@ yolact_base_config = coco_base_config.copy({
     'max_iter': 800000,
     
     # Backbone Settings
-    'backbone': resnet101_backbone.copy({
+    'backbone': resnet50_backbone.copy({
         'selected_layers': list(range(1, 4)),
         'use_pixel_scales': True,
         'preapply_sqrt': False,
@@ -783,6 +794,15 @@ yolact_resnet50_pascal_config = yolact_resnet50_config.copy({
         'pred_scales': [[32], [64], [128], [256], [512]],
         'use_square_anchors': False,
     })
+})
+
+
+yolact_mobilenetv2_coco_config = yolact_resnet50_config.copy({
+    'name': 'yolact_mobilenetv2_coco',
+    'backbone': mobilenetv2_backbone.copy(),
+    'use_semantic_segmentation_loss': True,
+    'dataset': scale2020_dataset,
+    'num_classes': len(scale2020_dataset.class_names) + 1,
 })
 
 # ----------------------- YOLACT++ CONFIGS ----------------------- #

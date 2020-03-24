@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import pickle
+import math
 
 from collections import OrderedDict
 
@@ -443,7 +444,155 @@ class VGGBackbone(nn.Module):
         self.channels.append(self.in_channels)
         self.layers.append(layer)
         
-                
+
+class InvertedResidual(nn.Module):
+    def __init__(self, inp, oup, stride, expand_ratio):
+        super(InvertedResidual, self).__init__()
+        self.stride = stride
+        assert stride in [1, 2]
+
+        hidden_dim = int(inp * expand_ratio)
+        self.use_res_connect = self.stride == 1 and inp == oup
+
+        if expand_ratio == 1:
+            self.conv = nn.Sequential(
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU6(inplace=True),
+                # pw-linear
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(oup),
+            )
+        else:
+            self.conv = nn.Sequential(
+                # pw
+                nn.Conv2d(inp, hidden_dim, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU6(inplace=True),
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU6(inplace=True),
+                # pw-linear
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(oup),
+            )
+
+    def forward(self, x):
+        if self.use_res_connect:
+            return x + self.conv(x)
+        else:
+            return self.conv(x)
+
+
+class MobileNetV2(nn.Module):
+    def __init__(self):
+        super(MobileNetV2, self).__init__()
+        block = InvertedResidual
+        input_channel = 32
+        interverted_residual_setting = [
+            # t, c, n, s
+            [1, 16, 1, 1],
+            [6, 24, 2, 2], # useful
+            [6, 32, 3, 2], # useful
+            [6, 64, 4, 2],
+            [6, 96, 3, 1], # useful
+            [6, 160, 3, 2],
+            [6, 320, 1, 1], # useful
+        ]
+
+        # Select the output layers
+        # idx-1 => 56 * 56 * 24
+        # idx-2 => 28 * 28 * 32
+        # idx-4 => 14 * 14 * 96
+        # idx-6 => 7 * 7 * 320
+        select_idxs = [1, 2, 4, 6]
+
+
+        # building first layer
+        input_channel = int(input_channel)
+        self.conv2d = nn.Conv2d(3, input_channel, 2)
+        self.layers = nn.ModuleList()
+        self.channels = []
+
+        # building inverted residual blocks
+        features = []
+        for idx, (t, c, n, s) in enumerate(interverted_residual_setting):
+            output_channel = int(c)
+
+            for i in range(n):
+                if i == 0:
+                    features.append(block(input_channel, output_channel, s, expand_ratio=t))
+                else:
+                    features.append(block(input_channel, output_channel, 1, expand_ratio=t))
+                input_channel = output_channel
+
+            if idx in select_idxs:
+                self.layers.append(nn.Sequential(*features))
+                self.channels.append(output_channel)
+                features = []
+
+        self.backbone_modules = [m for m in self.modules() if isinstance(m, nn.Conv2d)]
+
+        # random initial
+        self._initialize_weights()
+
+    def forward(self, x):
+        x = self.conv2d(x)
+
+        outs = []
+        for layer in self.layers:
+            x = layer(x)
+            outs.append(x)
+
+        return tuple(outs)
+
+    def _initialize_weights(self):
+        modules = self.modules()
+        for m in modules:
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, jmathj.sqrt(2. / n))
+                if m.bias is not None:
+                    m.bias.data.zero_()
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+
+    def init_backbone(self, path):
+        """ Initializes the backbone weights for training. """
+        state_dict = torch.load(path, map_location='cpu')
+
+        # Replace featuresXXX -> layers.x.xx(/conv2d.x) etc.
+        keys = list(state_dict)
+        for key in keys:
+            if key.startswith('features'):
+                idx = int(key.split('.')[1])
+                if idx <= 17:
+                    if idx == 0:
+                        new_key = 'conv2d.' + key[11:]
+                    elif (idx >= 1 and idx <= 3):
+                        new_key = "layers.0." + str(idx - 1) + key[10:]
+                    elif (idx >= 4 and idx <=6):
+                        new_key = "layers.1." + str(idx - 4) + key[10:]
+                    elif (idx >= 7 and idx <= 13):
+                        if idx <= 9:
+                            new_key = "layers.2." + str(idx - 7) + key[10:]
+                        else:
+                            new_key = "layers.2." + str(idx - 7) + key[11:]
+                    else:
+                        new_key = "layers.3." + str(idx - 14) + key[11:]
+
+                    state_dict[new_key] = state_dict.pop(key)
+                else:
+                    state_dict.pop(key)
+            else:
+                state_dict.pop(key)
+
+
+        # Note: Using strict=False is berry scary. Triple check this.nn.ModuleList()
+        self.load_state_dict(state_dict, strict=False)
 
 
 def construct_backbone(cfg):

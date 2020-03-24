@@ -55,7 +55,9 @@ class _DCNv2(Function):
                  stride, padding, dilation, deformable_groups):
         return g.op("DCNv2", input, offset, mask,\
                     weight, bias, \
-                    stride_i=stride, padding_i=padding, dilation_i=dilation, \
+                    stride_h_i=stride[0], stride_w_i=stride[1],\
+                    padding_h_i=padding[0], padding_w_i=padding[1],\
+                    dilation_h_i=dilation[0], dilation_w_i=dilation[1], \
                     deformable_groups_i=deformable_groups)
 
 dcn_v2_conv = _DCNv2.apply
