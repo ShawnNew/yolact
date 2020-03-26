@@ -173,7 +173,7 @@ class COCODetection(data.Dataset):
             print('Warning: Augmentation output an example with no ground truth. Resampling...')
             return self.pull_item(random.randint(0, len(self.ids)-1))
 
-        return torch.from_numpy(img).permute(2, 0, 1), target, masks, height, width, num_crowds
+        return torch.from_numpy(img).permute(2, 0, 1), target, masks, height, width, num_crowds, path
 
     def pull_image(self, index):
         '''Returns the original image object at index in PIL form

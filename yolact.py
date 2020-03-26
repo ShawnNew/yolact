@@ -166,7 +166,8 @@ class PredictionModule(nn.Module):
         conf_x = src.conf_extra(x)
         mask_x = src.mask_extra(x)
 
-        bbox = src.bbox_layer(bbox_x).permute(0, 2, 3, 1).contiguous().view(x.size(0), -1, 4)
+        batch_size = torch.tensor(x.size(0))
+        bbox = src.bbox_layer(bbox_x).permute(0, 2, 3, 1).contiguous().view(batch_size, -1, 4)
         conf = src.conf_layer(conf_x).permute(0, 2, 3, 1).contiguous().view(x.size(0), -1, self.num_classes)
         
         if cfg.eval_mask_branch:
@@ -325,16 +326,17 @@ class FPN(ScriptModuleWrapper):
         # For backward compatability, the conv layers are stored in reverse but the input and output is
         # given in the correct order. Thus, use j=-i-1 for the input and output and i for the conv layers.
         j = len(convouts)
-        sizes = [(69, 69), (35, 35)]
         for lat_layer in self.lat_layers:
             j -= 1
 
             if j < len(convouts) - 1:
-                if not self.onnx:
-                    _, _, h, w = convouts[j].size()
-                    x = F.interpolate(x, size=(h, w), mode=self.interpolation_mode, align_corners=False)
-                else:
-                    x = F.interpolate(x, size=sizes[j], mode=self.interpolation_mode, align_corners=False)
+                # if not self.onnx:
+                #     _, _, h, w = convouts[j].size()
+                #     x = F.interpolate(x, size=(h, w), mode=self.interpolation_mode, align_corners=False)
+                # else:
+                #     x = F.interpolate(x, size=sizes[j], mode=self.interpolation_mode, align_corners=False)
+                resize_shape = torch.tensor(convouts[j].size()[-2:])
+                x = F.interpolate(x, size=tuple(resize_shape), mode=self.interpolation_mode, align_corners=False)
 
             x = x + lat_layer(convouts[j])
             out[j] = x
@@ -624,7 +626,8 @@ class Yolact(nn.Module):
 
                 if cfg.mask_type == mask_type.lincomb and cfg.mask_proto_prototypes_as_features:
                     # Scale the prototypes down to the current prediction layer's size and add it as inputs
-                    proto_downsampled = F.interpolate(proto_downsampled, size=outs[idx].size()[2:], mode='bilinear', align_corners=False)
+                    downsample_size = torch.tensor(outs[idx].size()[2:])
+                    proto_downsampled = F.interpolate(proto_downsampled, size=tuple(downsample_size), mode='bilinear', align_corners=False)
                     pred_x = torch.cat([pred_x, proto_downsampled], dim=1)
 
                 # A hack for the way dataparallel works

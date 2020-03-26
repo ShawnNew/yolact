@@ -14,4 +14,6 @@ class InterpolateModule(nn.Module):
 		self.kwdargs = kwdargs
 
 	def forward(self, x):
-		return F.interpolate(x, *self.args, **self.kwdargs)
+		import torch
+		sh = torch.tensor(x.shape)
+		return F.interpolate(x, size=(sh[2] * 2, sh[3] * 2), mode='nearest')
