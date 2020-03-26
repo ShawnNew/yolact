@@ -13,6 +13,8 @@ def onnx_export(model, dataset, export):
     cur_path = os.getcwd()
     onnx_path = os.path.join(cur_path, export)
     onnx.export(model, batch_data, onnx_path, verbose=True, opset_version=10)
+    print("Successfully export to onnx.")
+    exit()
 
     # forward pytorch
     img, gt, gt_masks, h, w, num_crowd = dataset.pull_item(0)
